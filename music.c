@@ -110,6 +110,24 @@ typedef struct {
   FrameBuilder fb;
 } Sample;
 
+typedef struct {
+  Sample *s;
+  int frame;
+} Pattern;
+
+Frame Pattern_next_frame(Pattern *p, int i) {
+  if (i < p->s->frame)
+    return (Frame){};
+  if (i >= (p->s + 1)->frame) {
+    p->s++;
+    if (!p->s->fb.tab)
+      return (Frame){};
+    p->s->fb.tab->start(p->s->fb.ud);
+    p->frame = 0;
+  }
+  return p->s->fb.tab->next(p->s->fb.ud, SAMPLE_RATE, p->frame++);
+}
+
 int main(void) {
 
   if (sizeof(float[2]) != sizeof(Frame))
@@ -133,7 +151,7 @@ int main(void) {
       .envDecay = 15.0f,
       .frequency = 279.0f,
       .freqDecay = 45.0f,
-      .noiseAmount = 0.6f,
+      .noiseAmount = 0.5f,
       .noiseDecay = 10.1f,
       .limit = 0.4f,
   };
@@ -179,19 +197,11 @@ int main(void) {
   };
 
   float x = 0.0;
-  for (int k = 0; k < 4; ++k) {
-    int j = 0;
-
-    Sample *s = samples;
-    for (int i = 0; s && s->fb.ud && s->fb.ud; ++i) {
-      if (i >= (s + 1)->frame) {
-        s++;
-        if (!s->fb.tab)
-          break;
-        s->fb.tab->start(s->fb.ud);
-        j = 0;
-      }
-      SongWriter_add_frame(&w, s->fb.tab->next(s->fb.ud, SAMPLE_RATE, j++));
+  for (int k = 0; k < 8; ++k) {
+    Pattern p = (Pattern){samples, 0};
+    for (int i = 0; p.s && p.s->fb.ud && p.s->fb.ud; ++i) {
+      Frame f = Pattern_next_frame(&p, i);
+      SongWriter_add_frame(&w, f);
 
       x += 1.0f / (float)SAMPLE_RATE;
       sd.noiseDecay = 10.2f + 8.0f * sin(x * M_PI / 4.0f);
